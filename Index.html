@@ -36,14 +36,22 @@
             font-size: 20px;
             margin: 10px 0;
         }
+        #saveLoadControls {
+            text-align: center;
+            margin: 10px 0;
+        }
     </style>
 </head>
 <body>
     <h1>PixelWar</h1>
     <div id="timer">Time Left: 0 seconds</div>
+    <div id="saveLoadControls">
+        <button id="saveButton">Save Data</button>
+        <button id="loadButton">Load Data</button>
+    </div>
     <div id="container">
         <!-- Drawing canvas -->
-        <canvas id="pixelCanvas" width="5000" height="5000"></canvas>
+        <canvas id="pixelCanvas" width="5000" height="2500"></canvas>
     </div>
     <div id="colorPalette"></div>
     <p id="status"></p>
@@ -139,19 +147,6 @@
             if (timeLeft >= 60) cooldown = true; // Trigger cooldown if max time is reached
 
             drawCanvas();
-
-            // Simulate server update
-            fetch("/update", {
-                method: "POST",
-                headers: { "Content-Type": "application/json" },
-                body: JSON.stringify({ x, y, color: selectedColor })
-            }).then(res => res.json())
-              .then(data => console.log(data.message || "Pixel updated"));
         });
 
-        // Initialize the canvas and palette
-        drawCanvas();
-        initializePalette();
-    </script>
-</body>
-</html>
+        //
