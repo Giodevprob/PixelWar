@@ -1,42 +1,68 @@
+// server.js
+
 const express = require("express");
-const WebSocket = require("ws");
+const mongoose = require("mongoose");
+const bodyParser = require("body-parser");
+const cors = require("cors");
+
 const app = express();
-const PORT = 3000;
 
-// Serve static files
-app.use(express.static("."));
-app.use(express.json());
+// Middleware
+app.use(cors());
+app.use(bodyParser.json());
 
-// Store canvas data
-const canvas = Array(50 * 50).fill("#FFFFFF"); // 50x50 pixels
+// Connect to MongoDB (replace with your MongoDB URI)
+mongoose.connect("YOUR_MONGODB_CONNECTION_STRING", {
+  useNewUrlParser: true,
+  useUnifiedTopology: true,
+})
+  .then(() => console.log("MongoDB connected"))
+  .catch(err => console.log(err));
 
-// REST endpoint to update pixels
-app.post("/update", (req, res) => {
-    const { x, y, color } = req.body;
-    const index = y * 50 + x;
-    if (index >= 0 && index < canvas.length) {
-        canvas[index] = color;
-        res.json({ message: "Pixel updated!" });
-
-        // Notify WebSocket clients
-        broadcast({ x, y, color });
-    } else {
-        res.status(400).json({ message: "Invalid pixel coordinates." });
-    }
+// Define a schema and model for Pixel Art Data
+const pixelSchema = new mongoose.Schema({
+  pixels: [String],   // Array of pixel color data
+  timeLeft: Number,   // Time remaining for drawing
+  drawnPixels: Object // Tracks drawn pixels by index
 });
 
-// WebSocket server for real-time updates
-const wss = new WebSocket.Server({ noServer: true });
-function broadcast(data) {
-    wss.clients.forEach(client => {
-        if (client.readyState === WebSocket.OPEN) {
-            client.send(JSON.stringify(data));
-        }
-    });
-}
+const PixelArt = mongoose.model("PixelArt", pixelSchema);
 
-// Upgrade HTTP server to WebSocket server
-const server = app.listen(PORT, () => console.log(`Server running on http://localhost:${PORT}`));
-server.on("upgrade", (request, socket, head) => {
-    wss.handleUpgrade(request, socket, head, ws => wss.emit("connection", ws, request));
+// Route to save pixel data
+app.post("/save", async (req, res) => {
+  const { pixels, timeLeft, drawnPixels } = req.body;
+
+  try {
+    const newPixelArt = new PixelArt({
+      pixels,
+      timeLeft,
+      drawnPixels
+    });
+
+    const savedPixelArt = await newPixelArt.save();
+    res.json({ message: "Data saved!", id: savedPixelArt._id });
+  } catch (error) {
+    res.status(500).json({ message: "Error saving data", error });
+  }
+});
+
+// Route to load pixel data by ID
+app.get("/load/:id", async (req, res) => {
+  const { id } = req.params;
+
+  try {
+    const pixelArt = await PixelArt.findById(id);
+    if (!pixelArt) {
+      return res.status(404).json({ message: "Data not found" });
+    }
+    res.json(pixelArt);
+  } catch (error) {
+    res.status(500).json({ message: "Error loading data", error });
+  }
+});
+
+// Start the server
+const port = 5000;
+app.listen(port, () => {
+  console.log(`Server running on port ${port}`);
 });
