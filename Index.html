@@ -1,0 +1,157 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Pixel Art with Timer</title>
+    <style>
+        #container {
+            overflow: auto;
+            width: 800px;
+            height: 800px;
+            border: 2px solid black;
+            margin: auto;
+            position: relative;
+        }
+        canvas {
+            position: absolute;
+            cursor: crosshair;
+        }
+        #colorPalette {
+            display: flex;
+            margin: 10px 0;
+        }
+        .color-box {
+            width: 30px;
+            height: 30px;
+            margin: 5px;
+            cursor: pointer;
+            border: 2px solid transparent;
+        }
+        .color-box.selected {
+            border-color: black;
+        }
+        #timer {
+            text-align: center;
+            font-size: 20px;
+            margin: 10px 0;
+        }
+    </style>
+</head>
+<body>
+    <h1>Pixel Canvas with Timer</h1>
+    <div id="timer">Time Left: 0 seconds</div>
+    <div id="container">
+        <!-- Drawing canvas -->
+        <canvas id="pixelCanvas" width="2000" height="1000"></canvas>
+    </div>
+    <div id="colorPalette"></div>
+    <p id="status"></p>
+
+    <script>
+        const canvas = document.getElementById("pixelCanvas");
+        const ctx = canvas.getContext("2d");
+        const colorPalette = document.getElementById("colorPalette");
+        const timerDisplay = document.getElementById("timer");
+
+        const pixelSize = 10;
+        const rows = canvas.width / pixelSize;
+        const cols = canvas.height / pixelSize;
+
+        const colors = ["#FF0000", "#FFFF00", "#0000FF", "#008000", "#808080"]; // Red, Yellow, Blue, Green, Gray
+        let selectedColor = colors[0]; // Default to the first color (Red)
+
+        const pixels = Array(rows * cols).fill("#FFFFFF");
+        const drawnPixels = {}; // To track previously drawn pixels
+        let timeLeft = 0; // Start with 0 seconds
+        let cooldown = false;
+
+        // Initialize color palette
+        function initializePalette() {
+            colors.forEach((color, index) => {
+                const colorBox = document.createElement("div");
+                colorBox.className = "color-box";
+                colorBox.style.backgroundColor = color;
+                if (index === 0) colorBox.classList.add("selected");
+                colorBox.addEventListener("click", () => selectColor(colorBox, color));
+                colorPalette.appendChild(colorBox);
+            });
+        }
+
+        function selectColor(colorBox, color) {
+            document.querySelectorAll(".color-box").forEach(box => box.classList.remove("selected"));
+            colorBox.classList.add("selected");
+            selectedColor = color;
+        }
+
+        // Timer logic
+        function updateTimer() {
+            if (timeLeft > 0) {
+                timeLeft -= 1;
+                if (timeLeft <= 0) cooldown = false;
+            }
+            timerDisplay.textContent = `Time Left: ${timeLeft} seconds`;
+        }
+
+        setInterval(updateTimer, 1000); // Update the timer every second
+
+        // Draw the initial canvas
+        function drawCanvas() {
+            for (let y = 0; y < cols; y++) {
+                for (let x = 0; x < rows; x++) {
+                    ctx.fillStyle = pixels[y * rows + x];
+                    ctx.fillRect(x * pixelSize, y * pixelSize, pixelSize, pixelSize);
+                }
+            }
+        }
+
+        // Handle pixel drawing
+        canvas.addEventListener("click", (event) => {
+            // If cooldown is active, prevent drawing
+            if (cooldown) {
+                alert("You must wait until the timer goes down!");
+                return;
+            }
+
+            const rect = canvas.getBoundingClientRect();
+            const x = Math.floor((event.clientX - rect.left) / pixelSize);
+            const y = Math.floor((event.clientY - rect.top) / pixelSize);
+
+            const index = y * rows + x;
+            const pixelColor = pixels[index];
+
+            if (pixelColor === selectedColor) {
+                alert("This pixel already has this color!");
+                return;
+            }
+
+            pixels[index] = selectedColor;
+
+            if (drawnPixels[index]) {
+                // Previously drawn pixel, add 4 seconds
+                timeLeft = Math.min(60, timeLeft + 4);
+            } else {
+                // New pixel, add 2 seconds
+                timeLeft = Math.min(60, timeLeft + 2);
+                drawnPixels[index] = true; // Mark pixel as drawn
+            }
+
+            if (timeLeft >= 60) cooldown = true; // Trigger cooldown if max time is reached
+
+            drawCanvas();
+
+            // Simulate server update
+            fetch("/update", {
+                method: "POST",
+                headers: { "Content-Type": "application/json" },
+                body: JSON.stringify({ x, y, color: selectedColor })
+            }).then(res => res.json())
+              .then(data => console.log(data.message || "Pixel updated"));
+        });
+
+        // Initialize the canvas and palette
+        drawCanvas();
+        initializePalette();
+    </script>
+</body>
+</html>
